@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
     <style>
         :root {
             --bg-color: #000000;
@@ -14,6 +15,7 @@
             --muted-color: #888888;
             --border-color: #333333;
             --primary-color: #ffffff;
+            --success-color: #22c55e; /* Green for success */
         }
 
         html {
@@ -68,12 +70,12 @@
 
         .container {
             width: 100%;
-            max-width: 800px; /* Scaled down container */
+            max-width: 800px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 2rem; /* Scaled down gap */
+            gap: 2rem;
             flex-grow: 1;
             padding: 1rem 0;
         }
@@ -88,18 +90,18 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-width: 140px; /* Scaled down segment */
+            min-width: 140px;
         }
 
         .timer-value {
-            font-size: 6em; /* Scaled down timer font */
+            font-size: 6em;
             font-weight: 200;
             line-height: 1;
             color: var(--text-color);
         }
         
         .timer-separator {
-            font-size: 4em; /* Scaled down separator */
+            font-size: 4em;
             font-weight: 200;
             margin: 0 1rem;
             transform: translateY(-0.1em);
@@ -107,7 +109,7 @@
         }
 
         .timer-label {
-            font-size: 0.8em; /* Scaled down label */
+            font-size: 0.8em;
             font-weight: 500;
             color: var(--muted-color);
             text-transform: uppercase;
@@ -139,8 +141,8 @@
             background-color: var(--text-color);
             border-color: var(--text-color);
             color: var(--bg-color);
-            transform: translateY(-2px); /* Added hover effect */
-            box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1); /* Added hover effect */
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
         }
 
         .info-section {
@@ -151,16 +153,28 @@
         
         .stat-item {
             font-size: 1em;
-            transition: color 0.3s ease; /* Added hover effect */
-        }
-
-        .stat-item:hover {
-            color: var(--text-color); /* Added hover effect */
+            transition: color 0.3s ease;
         }
         
         .stat-item strong {
             color: var(--text-color);
             font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .goal-check {
+            display: none; /* Hidden by default */
+            color: var(--success-color);
+            margin-right: 0.5rem;
+            font-weight: 700;
+        }
+        
+        .goal-complete strong {
+            color: var(--success-color); /* Change text color on goal complete */
+        }
+
+        .goal-complete .goal-check {
+            display: inline; /* Show checkmark on goal complete */
         }
 
         .goal-setters {
@@ -366,13 +380,14 @@
         </div>
 
         <div class="info-section">
-            <div class="stat-item">Goal: <strong id="goalDisplay">Not Set</strong></div>
-            <div class="stat-item">Worked Today: <strong id="timeWorked">0h 0m</strong></div>
+            <div class="stat-item" id="goalStatItem">Goal: <strong id="goalDisplay"><span class="goal-check">✓</span>Not Set</strong></div>
+            <div class="stat-item" id="workedStatItem">Worked Today: <strong id="timeWorked">0h 0m</strong></div>
         </div>
 
         <div class="goal-setters">
             <input type="number" id="hourInput" class="goal-input" placeholder="Hours" min="0">
             <input type="number" id="minuteInput" class="goal-input" placeholder="Minutes" min="0">
+            <input type="number" id="secondInput" class="goal-input" placeholder="Seconds" min="0">
             <button class="control-button" onclick="setGoal()">Set Goal</button>
         </div>
     </div>
@@ -395,19 +410,65 @@
 
     <script>
         let timer;
-        let seconds = 0;
+        let seconds; // Will hold the remaining seconds for the countdown
         let totalWorked = 0;
         let isRunning = false;
         let totalGoalSeconds = 0;
+        let isGoalComplete = false;
         
         const hoursEl = document.getElementById('hours');
         const minutesEl = document.getElementById('minutes');
         const secondsEl = document.getElementById('seconds');
+        const goalStatItem = document.getElementById('goalStatItem');
+        const workedStatItem = document.getElementById('workedStatItem');
+        const goalDisplay = document.getElementById('goalDisplay');
         
         const modal = document.getElementById('customAlert');
+        const modalTitle = document.getElementById('modalTitle');
         const modalMessage = document.getElementById('modalMessage');
 
-        function showModal(message) {
+        // --- New Sound and Confetti Logic ---
+
+        let audioCtx;
+        function playCompletionSound() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            // Create a more melodic sound (C major arpeggio)
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+            let startTime = audioCtx.currentTime;
+
+            notes.forEach((note, i) => {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(note, startTime + i * 0.1);
+                gainNode.gain.setValueAtTime(0.3, startTime + i * 0.1);
+
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, startTime + i * 0.1 + 0.2);
+                oscillator.start(startTime + i * 0.1);
+                oscillator.stop(startTime + i * 0.1 + 0.2);
+            });
+        }
+
+        function triggerConfetti() {
+            confetti({
+                particleCount: 150,
+                spread: 90,
+                origin: { y: 0.6 }
+            });
+        }
+
+        // --- End New Logic ---
+
+
+        function showModal(message, title = "Set a Goal") {
+            modalTitle.textContent = title;
             modalMessage.textContent = message;
             modal.classList.add('visible');
         }
@@ -416,15 +477,15 @@
             modal.classList.remove('visible');
         }
 
-        function formatTime(totalSeconds) {
-            const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-            const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-            const secs = String(totalSeconds % 60).padStart(2, '0');
+        function formatTime(timeInSeconds) {
+            const hrs = String(Math.floor(timeInSeconds / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((timeInSeconds % 3600) / 60)).padStart(2, '0');
+            const secs = String(timeInSeconds % 60).padStart(2, '0');
             return { hrs, mins, secs };
         }
 
         function updateTimerDisplay() {
-            // Update main timer
+            // Update main timer to show remaining time
             let displayTime = formatTime(seconds);
             hoursEl.textContent = displayTime.hrs;
             minutesEl.textContent = displayTime.mins;
@@ -434,14 +495,26 @@
             let workedHours = Math.floor(totalWorked / 3600);
             let workedMinutes = Math.floor((totalWorked % 3600) / 60);
             document.getElementById('timeWorked').textContent = `${workedHours}h ${workedMinutes}m`;
+
+            // Check if goal is complete
+            if (seconds <= 0 && totalGoalSeconds > 0 && !isGoalComplete) {
+                isGoalComplete = true;
+                goalStatItem.classList.add('goal-complete');
+                workedStatItem.classList.add('goal-complete');
+                pauseTimer(); // Stop the timer automatically
+                playCompletionSound();
+                triggerConfetti();
+                showModal("You've reached your goal. Great work!", "Congratulations!");
+            }
         }
 
         function startTimer() {
             if (!isRunning && totalGoalSeconds > 0) {
+                if (isGoalComplete) return; // Don't start if goal is already complete
                 isRunning = true;
                 timer = setInterval(() => {
-                    seconds++;
-                    totalWorked++;
+                    seconds--; // Count down
+                    totalWorked++; // Still count up for total work
                     updateTimerDisplay();
                 }, 1000);
             } else if (totalGoalSeconds <= 0) {
@@ -459,29 +532,36 @@
         function resetTimer() {
             clearInterval(timer);
             isRunning = false;
-            seconds = 0;
+            isGoalComplete = false;
+            seconds = totalGoalSeconds; // Reset countdown to the full goal time
+            goalStatItem.classList.remove('goal-complete');
+            workedStatItem.classList.remove('goal-complete');
             updateTimerDisplay();
         }
 
         function setGoal() {
             let hours = parseInt(document.getElementById('hourInput').value) || 0;
             let minutes = parseInt(document.getElementById('minuteInput').value) || 0;
-            totalGoalSeconds = (hours * 3600) + (minutes * 60);
+            let secs = parseInt(document.getElementById('secondInput').value) || 0;
+            totalGoalSeconds = (hours * 3600) + (minutes * 60) + secs;
             
             if (totalGoalSeconds <= 0) {
                 showModal("Please enter a valid goal time.");
                 return;
             }
             
+            totalWorked = 0; // Reset total worked time when a new goal is set
             resetTimer();
 
-            document.getElementById('goalDisplay').textContent = `${hours}h ${minutes}m`;
+            goalDisplay.innerHTML = `<span class="goal-check">✓</span>${hours}h ${minutes}m ${secs}s`;
             
             document.getElementById('hourInput').value = '';
             document.getElementById('minuteInput').value = '';
+            document.getElementById('secondInput').value = '';
         }
         
-        // Initial call to set timer to 00:00:00
+        // Initial setup
+        seconds = 0;
         updateTimerDisplay();
     </script>
 </body>
