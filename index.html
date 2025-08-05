@@ -80,6 +80,19 @@
             padding: 1rem 0;
         }
 
+        .completion-message {
+            color: var(--success-color);
+            font-weight: 500;
+            font-size: 1.2em;
+            height: 1.5em; /* Reserve space to prevent layout shift */
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .completion-message.visible {
+            opacity: 1;
+        }
+
         .timer-wrapper {
             display: flex;
             align-items: baseline;
@@ -356,6 +369,7 @@
     </header>
 
     <div class="container">
+        <div id="completionMessage" class="completion-message"></div>
         <div class="timer-wrapper">
             <div class="timer-segment">
                 <span id="hours" class="timer-value">00</span>
@@ -422,12 +436,13 @@
         const goalStatItem = document.getElementById('goalStatItem');
         const workedStatItem = document.getElementById('workedStatItem');
         const goalDisplay = document.getElementById('goalDisplay');
+        const completionMessage = document.getElementById('completionMessage');
         
         const modal = document.getElementById('customAlert');
         const modalTitle = document.getElementById('modalTitle');
         const modalMessage = document.getElementById('modalMessage');
 
-        // --- New Sound and Confetti Logic ---
+        // --- Sound and Confetti Logic ---
 
         let audioCtx;
         function playCompletionSound() {
@@ -435,7 +450,6 @@
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
             
-            // Create a more melodic sound (C major arpeggio)
             const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
             let startTime = audioCtx.currentTime;
 
@@ -504,7 +518,8 @@
                 pauseTimer(); // Stop the timer automatically
                 playCompletionSound();
                 triggerConfetti();
-                showModal("You've reached your goal. Great work!", "Congratulations!");
+                completionMessage.textContent = "Congratulations! Goal Reached!";
+                completionMessage.classList.add('visible');
             }
         }
 
@@ -536,6 +551,7 @@
             seconds = totalGoalSeconds; // Reset countdown to the full goal time
             goalStatItem.classList.remove('goal-complete');
             workedStatItem.classList.remove('goal-complete');
+            completionMessage.classList.remove('visible');
             updateTimerDisplay();
         }
 
