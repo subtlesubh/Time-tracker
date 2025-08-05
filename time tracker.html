@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimalist Time Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --muted-color: #888888;
+            --border-color: #333333;
+            --primary-color: #ffffff;
+        }
+
+        html {
+            background-color: var(--bg-color);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            text-align: center;
+            padding: 2rem 3rem;
+            margin: 2.5rem;
+            min-height: calc(100vh - 5rem);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            border: 2px solid var(--border-color);
+        }
+
+        .site-header, .site-footer {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .site-header {
+            font-size: 0.9em;
+            padding-bottom: 1.5rem;
+        }
+        
+        .site-footer {
+            font-size: 0.9em;
+            padding-top: 1.5rem;
+        }
+
+        .logo {
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        .header-nav {
+            color: var(--muted-color);
+            font-weight: 500;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px; /* Scaled down container */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem; /* Scaled down gap */
+            flex-grow: 1;
+            padding: 1rem 0;
+        }
+
+        .timer-wrapper {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+        }
+
+        .timer-segment {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 140px; /* Scaled down segment */
+        }
+
+        .timer-value {
+            font-size: 6em; /* Scaled down timer font */
+            font-weight: 200;
+            line-height: 1;
+            color: var(--text-color);
+        }
+        
+        .timer-separator {
+            font-size: 4em; /* Scaled down separator */
+            font-weight: 200;
+            margin: 0 1rem;
+            transform: translateY(-0.1em);
+            color: var(--muted-color);
+        }
+
+        .timer-label {
+            font-size: 0.8em; /* Scaled down label */
+            font-weight: 500;
+            color: var(--muted-color);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 0.75rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .control-button {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--muted-color);
+            padding: 0.8rem 2rem;
+            border-radius: 50px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-button:hover {
+            background-color: var(--text-color);
+            border-color: var(--text-color);
+            color: var(--bg-color);
+            transform: translateY(-2px); /* Added hover effect */
+            box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1); /* Added hover effect */
+        }
+
+        .info-section {
+            display: flex;
+            gap: 3rem;
+            color: var(--muted-color);
+        }
+        
+        .stat-item {
+            font-size: 1em;
+            transition: color 0.3s ease; /* Added hover effect */
+        }
+
+        .stat-item:hover {
+            color: var(--text-color); /* Added hover effect */
+        }
+        
+        .stat-item strong {
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        .goal-setters {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .goal-input {
+            background: transparent;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 0.8rem;
+            width: 90px;
+            text-align: center;
+            font-size: 1em;
+            border-radius: 8px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            transition: border-color 0.3s ease;
+        }
+        
+        .goal-input::placeholder {
+            color: var(--muted-color);
+        }
+        
+        .goal-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .footer-links a {
+            color: var(--muted-color);
+            text-decoration: none;
+            margin-right: 1.5rem;
+            transition: color 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .footer-links a:hover {
+            color: var(--text-color);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            z-index: 1000;
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: #111;
+            padding: 2.5rem;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+            color: var(--text-color);
+            font-size: 1.5em;
+        }
+        
+        .modal-content p {
+            font-size: 1em;
+            color: var(--muted-color);
+        }
+
+        .modal-content button {
+            background: var(--text-color);
+            color: var(--bg-color);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 600;
+            margin-top: 1.5rem;
+            width: 100%;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 900px) {
+            .timer-value {
+                font-size: 5em;
+            }
+            .timer-separator {
+                font-size: 4em;
+            }
+            .timer-segment {
+                min-width: 120px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .timer-value {
+                font-size: 4em;
+            }
+            .timer-separator {
+                font-size: 3em;
+            }
+            .timer-segment {
+                min-width: 90px;
+            }
+            .controls {
+                flex-direction: column;
+                width: 80%;
+                max-width: 250px;
+            }
+            .site-header, .site-footer {
+                padding: 0;
+                font-size: 0.8em;
+            }
+             body {
+                margin: 1.5rem;
+                min-height: calc(100vh - 3rem);
+                padding: 1.5rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .timer-value {
+                font-size: 2.5em;
+            }
+            .timer-separator {
+                font-size: 2em;
+            }
+            .timer-segment {
+                min-width: 60px;
+            }
+            .info-section {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .site-header, .site-footer {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            body {
+                margin: 1rem;
+                min-height: calc(100vh - 2rem);
+                padding: 1rem;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="logo">Subh's Tracker</div>
+        <nav class="header-nav">
+            <span>A Minimalist Tool</span>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="timer-wrapper">
+            <div class="timer-segment">
+                <span id="hours" class="timer-value">00</span>
+                <span class="timer-label">Hours</span>
+            </div>
+            <span class="timer-separator">:</span>
+            <div class="timer-segment">
+                <span id="minutes" class="timer-value">00</span>
+                <span class="timer-label">Minutes</span>
+            </div>
+            <span class="timer-separator">:</span>
+            <div class="timer-segment">
+                <span id="seconds" class="timer-value">00</span>
+                <span class="timer-label">Seconds</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="control-button" onclick="startTimer()">Start</button>
+            <button class="control-button" onclick="pauseTimer()">Pause</button>
+            <button class="control-button" onclick="resetTimer()">Reset</button>
+        </div>
+
+        <div class="info-section">
+            <div class="stat-item">Goal: <strong id="goalDisplay">Not Set</strong></div>
+            <div class="stat-item">Worked Today: <strong id="timeWorked">0h 0m</strong></div>
+        </div>
+
+        <div class="goal-setters">
+            <input type="number" id="hourInput" class="goal-input" placeholder="Hours" min="0">
+            <input type="number" id="minuteInput" class="goal-input" placeholder="Minutes" min="0">
+            <button class="control-button" onclick="setGoal()">Set Goal</button>
+        </div>
+    </div>
+    
+    <footer class="site-footer">
+        <div class="footer-links">
+            <a href="https://github.com/subtlesubh" target="_blank">Github</a>
+            <a href="https://www.instagram.com/hustlewithsubh?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" target="_blank">Instagram</a>
+        </div>
+        <span>subhgbusiness@gmail.com</span>
+    </footer>
+
+    <div class="modal-overlay" id="customAlert">
+        <div class="modal-content">
+            <h2 id="modalTitle">Set a Goal</h2>
+            <p id="modalMessage"></p>
+            <button onclick="closeModal()">OK</button>
+        </div>
+    </div>
+
+    <script>
+        let timer;
+        let seconds = 0;
+        let totalWorked = 0;
+        let isRunning = false;
+        let totalGoalSeconds = 0;
+        
+        const hoursEl = document.getElementById('hours');
+        const minutesEl = document.getElementById('minutes');
+        const secondsEl = document.getElementById('seconds');
+        
+        const modal = document.getElementById('customAlert');
+        const modalMessage = document.getElementById('modalMessage');
+
+        function showModal(message) {
+            modalMessage.textContent = message;
+            modal.classList.add('visible');
+        }
+
+        function closeModal() {
+            modal.classList.remove('visible');
+        }
+
+        function formatTime(totalSeconds) {
+            const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+            const secs = String(totalSeconds % 60).padStart(2, '0');
+            return { hrs, mins, secs };
+        }
+
+        function updateTimerDisplay() {
+            // Update main timer
+            let displayTime = formatTime(seconds);
+            hoursEl.textContent = displayTime.hrs;
+            minutesEl.textContent = displayTime.mins;
+            secondsEl.textContent = displayTime.secs;
+            
+            // Update "Time Worked" display
+            let workedHours = Math.floor(totalWorked / 3600);
+            let workedMinutes = Math.floor((totalWorked % 3600) / 60);
+            document.getElementById('timeWorked').textContent = `${workedHours}h ${workedMinutes}m`;
+        }
+
+        function startTimer() {
+            if (!isRunning && totalGoalSeconds > 0) {
+                isRunning = true;
+                timer = setInterval(() => {
+                    seconds++;
+                    totalWorked++;
+                    updateTimerDisplay();
+                }, 1000);
+            } else if (totalGoalSeconds <= 0) {
+                showModal("Please set a goal before starting the timer.");
+            }
+        }
+
+        function pauseTimer() {
+            if (isRunning) {
+                clearInterval(timer);
+                isRunning = false;
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timer);
+            isRunning = false;
+            seconds = 0;
+            updateTimerDisplay();
+        }
+
+        function setGoal() {
+            let hours = parseInt(document.getElementById('hourInput').value) || 0;
+            let minutes = parseInt(document.getElementById('minuteInput').value) || 0;
+            totalGoalSeconds = (hours * 3600) + (minutes * 60);
+            
+            if (totalGoalSeconds <= 0) {
+                showModal("Please enter a valid goal time.");
+                return;
+            }
+            
+            resetTimer();
+
+            document.getElementById('goalDisplay').textContent = `${hours}h ${minutes}m`;
+            
+            document.getElementById('hourInput').value = '';
+            document.getElementById('minuteInput').value = '';
+        }
+        
+        // Initial call to set timer to 00:00:00
+        updateTimerDisplay();
+    </script>
+</body>
+</html>
