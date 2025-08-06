@@ -18,8 +18,17 @@
             --success-color: #22c55e; /* Green for success */
         }
 
+        body.light-mode {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --muted-color: #777777;
+            --border-color: #dddddd;
+            --primary-color: #000000;
+        }
+
         html {
             background-color: var(--bg-color);
+            transition: background-color 0.3s ease;
         }
 
         body {
@@ -36,6 +45,7 @@
             align-items: center;
             box-sizing: border-box;
             border: 2px solid var(--border-color);
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
         }
 
         .site-header, .site-footer {
@@ -66,6 +76,28 @@
         .header-nav {
             color: var(--muted-color);
             font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .theme-switcher {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--muted-color);
+            padding: 0.5rem;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .theme-switcher:hover {
+            background-color: var(--text-color);
+            border-color: var(--text-color);
+            color: var(--bg-color);
         }
 
         .container {
@@ -265,6 +297,10 @@
             max-width: 400px;
         }
         
+        body.light-mode .modal-content {
+            background: #f0f0f0;
+        }
+        
         .modal-overlay.visible .modal-content {
             transform: scale(1);
         }
@@ -365,6 +401,9 @@
         <div class="logo">Subh's Tracker</div>
         <nav class="header-nav">
             <span>A Minimalist Tool</span>
+            <button class="theme-switcher" id="themeSwitcher" aria-label="Toggle theme">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
         </nav>
     </header>
 
@@ -437,37 +476,88 @@
         const workedStatItem = document.getElementById('workedStatItem');
         const goalDisplay = document.getElementById('goalDisplay');
         const completionMessage = document.getElementById('completionMessage');
+        const themeSwitcher = document.getElementById('themeSwitcher');
         
         const modal = document.getElementById('customAlert');
         const modalTitle = document.getElementById('modalTitle');
         const modalMessage = document.getElementById('modalMessage');
 
+        // --- Theme Switcher Logic ---
+        function setLightMode() {
+            document.body.classList.add('light-mode');
+            themeSwitcher.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+            localStorage.setItem('theme', 'light');
+        }
+
+        function setDarkMode() {
+            document.body.classList.remove('light-mode');
+            themeSwitcher.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+            localStorage.setItem('theme', 'dark');
+        }
+
+        themeSwitcher.addEventListener('click', () => {
+            if (document.body.classList.contains('light-mode')) {
+                setDarkMode();
+            } else {
+                setLightMode();
+            }
+        });
+
+        // Load theme from local storage
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                setLightMode();
+            } else {
+                setDarkMode();
+            }
+        });
+
+
         // --- Sound and Confetti Logic ---
 
         let audioCtx;
-        function playCompletionSound() {
+        function getAudioContext() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
-            
-            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-            let startTime = audioCtx.currentTime;
+            return audioCtx;
+        }
 
+        function playSound(notes, duration = 0.1, volume = 0.2) {
+            const ctx = getAudioContext();
+            let startTime = ctx.currentTime;
             notes.forEach((note, i) => {
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
+                const oscillator = ctx.createOscillator();
+                const gainNode = ctx.createGain();
 
                 oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
+                gainNode.connect(ctx.destination);
 
                 oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(note, startTime + i * 0.1);
-                gainNode.gain.setValueAtTime(0.3, startTime + i * 0.1);
+                oscillator.frequency.setValueAtTime(note, startTime + i * duration);
+                gainNode.gain.setValueAtTime(volume, startTime + i * duration);
 
-                gainNode.gain.exponentialRampToValueAtTime(0.00001, startTime + i * 0.1 + 0.2);
-                oscillator.start(startTime + i * 0.1);
-                oscillator.stop(startTime + i * 0.1 + 0.2);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, startTime + i * duration + duration);
+                oscillator.start(startTime + i * duration);
+                oscillator.stop(startTime + i * duration + duration);
             });
+        }
+        
+        function playStartSound() {
+            playSound([440, 587.33], 0.08, 0.2); // A4, D5
+        }
+
+        function playPauseSound() {
+            playSound([220], 0.1, 0.15); // A3
+        }
+
+        function playResetSound() {
+            playSound([587.33, 440], 0.08, 0.2); // D5, A4
+        }
+
+        function playCompletionSound() {
+            playSound([523.25, 659.25, 783.99, 1046.50], 0.1, 0.3); // C5, E5, G5, C6
         }
 
         function triggerConfetti() {
@@ -478,7 +568,7 @@
             });
         }
 
-        // --- End New Logic ---
+        // --- End Sound Logic ---
 
 
         function showModal(message, title = "Set a Goal") {
@@ -516,7 +606,7 @@
                 isGoalComplete = true;
                 goalStatItem.classList.add('goal-complete');
                 workedStatItem.classList.add('goal-complete');
-                pauseTimer(); // Stop the timer automatically
+                pauseTimer(true); // Stop the timer automatically, without sound
                 playCompletionSound();
                 triggerConfetti();
                 completionMessage.textContent = "Congratulations! Goal Reached!";
@@ -528,6 +618,7 @@
             if (!isRunning && totalGoalSeconds > 0) {
                 if (isGoalComplete) return; // Don't start if goal is already complete
                 isRunning = true;
+                playStartSound();
                 timer = setInterval(() => {
                     seconds--; // Count down
                     totalWorked++; // Still count up for total work
@@ -538,10 +629,13 @@
             }
         }
 
-        function pauseTimer() {
+        function pauseTimer(isAutoPause = false) {
             if (isRunning) {
                 clearInterval(timer);
                 isRunning = false;
+                if (!isAutoPause) {
+                    playPauseSound();
+                }
             }
         }
 
@@ -553,6 +647,9 @@
             goalStatItem.classList.remove('goal-complete');
             workedStatItem.classList.remove('goal-complete');
             completionMessage.classList.remove('visible');
+            if (totalGoalSeconds > 0) {
+                playResetSound();
+            }
             updateTimerDisplay();
         }
 
