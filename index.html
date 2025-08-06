@@ -395,7 +395,7 @@
 
         <div class="info-section">
             <div class="stat-item" id="goalStatItem">Goal: <strong id="goalDisplay"><span class="goal-check">✓</span>Not Set</strong></div>
-            <div class="stat-item" id="workedStatItem">Worked Today: <strong id="timeWorked">0h 0m</strong></div>
+            <div class="stat-item" id="workedStatItem">Worked Today: <strong id="timeWorked">0h 0m 0s</strong></div>
         </div>
 
         <div class="goal-setters">
@@ -508,7 +508,8 @@
             // Update "Time Worked" display
             let workedHours = Math.floor(totalWorked / 3600);
             let workedMinutes = Math.floor((totalWorked % 3600) / 60);
-            document.getElementById('timeWorked').textContent = `${workedHours}h ${workedMinutes}m`;
+            let workedSeconds = totalWorked % 60;
+            document.getElementById('timeWorked').textContent = `${workedHours}h ${workedMinutes}m ${workedSeconds}s`;
 
             // Check if goal is complete
             if (seconds <= 0 && totalGoalSeconds > 0 && !isGoalComplete) {
@@ -566,7 +567,6 @@
                 return;
             }
             
-            totalWorked = 0; // Reset total worked time when a new goal is set
             resetTimer();
 
             goalDisplay.innerHTML = `<span class="goal-check">✓</span>${hours}h ${minutes}m ${secs}s`;
