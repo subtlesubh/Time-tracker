@@ -11,6 +11,7 @@
     <style>
         :root {
             --page-bg-color: #000000;
+            --page-bg-image: none;
             --content-bg-color: #000000;
             --text-color: #ffffff;
             --muted-color: #888888;
@@ -30,6 +31,10 @@
 
         html {
             background-color: var(--page-bg-color);
+            background-image: var(--page-bg-image);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
             transition: background-color 0.3s ease;
         }
 
@@ -83,7 +88,7 @@
             gap: 1.5rem;
         }
 
-        .theme-switcher {
+        .icon-button {
             background: transparent;
             border: 1px solid var(--border-color);
             color: var(--text-color);
@@ -95,15 +100,23 @@
             justify-content: center;
             transition: all 0.3s ease;
         }
+        
+        .icon-button:hover {
+            background-color: var(--text-color);
+            color: var(--page-bg-color);
+        }
 
-        .light-mode .theme-switcher:hover {
+        .light-mode .icon-button:hover {
              background-color: var(--text-color);
              color: var(--content-bg-color);
         }
+
+        #removeBgButton {
+            display: none;
+        }
         
-        .theme-switcher:hover {
-            background-color: var(--text-color);
-            color: var(--page-bg-color);
+        #bgInput {
+            display: none;
         }
 
         .container {
@@ -212,6 +225,8 @@
             display: flex;
             gap: 3rem;
             color: var(--muted-color);
+            flex-wrap: wrap;
+            justify-content: center;
         }
         
         .stat-item {
@@ -419,7 +434,14 @@
         <div class="logo">Subh's Tracker</div>
         <nav class="header-nav">
             <span>A Minimalist Tool</span>
-            <button class="theme-switcher" id="themeSwitcher" aria-label="Toggle theme">
+            <input type="file" id="bgInput" accept="image/*">
+            <label for="bgInput" class="icon-button" id="bgLabel" aria-label="Upload background image">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            </label>
+            <button class="icon-button" id="removeBgButton" aria-label="Remove background image">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <button class="icon-button theme-switcher" id="themeSwitcher" aria-label="Toggle theme">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
         </nav>
@@ -453,6 +475,7 @@
         <div class="info-section">
             <div class="stat-item" id="goalStatItem">Goal: <strong id="goalDisplay"><span class="goal-check">✓</span>Not Set</strong></div>
             <div class="stat-item" id="workedStatItem">Worked Today: <strong id="timeWorked">0h 0m 0s</strong></div>
+            <div class="stat-item" id="allTimeStatItem">All-Time: <strong id="allTimeWorked">0h 0m 0s</strong></div>
         </div>
 
         <div class="goal-setters">
@@ -480,67 +503,98 @@
     </div>
 
     <script>
-        let timer;
-        let seconds; // Will hold the remaining seconds for the countdown
-        let totalWorked = 0;
+        // Global state variables
+        let seconds; 
+        let totalWorkedToday = 0;
+        let allTimeTotal = 0;
+        let lastSavedDate = new Date().toLocaleDateString();
         let isRunning = false;
         let totalGoalSeconds = 0;
         let isGoalComplete = false;
+        let timerWorker;
         
+        // DOM element references
         const hoursEl = document.getElementById('hours');
         const minutesEl = document.getElementById('minutes');
         const secondsEl = document.getElementById('seconds');
         const goalStatItem = document.getElementById('goalStatItem');
         const workedStatItem = document.getElementById('workedStatItem');
+        const allTimeStatItem = document.getElementById('allTimeStatItem');
         const goalDisplay = document.getElementById('goalDisplay');
         const completionMessage = document.getElementById('completionMessage');
         const themeSwitcher = document.getElementById('themeSwitcher');
-        
+        const bgInput = document.getElementById('bgInput');
+        const removeBgButton = document.getElementById('removeBgButton');
         const modal = document.getElementById('customAlert');
         const modalTitle = document.getElementById('modalTitle');
         const modalMessage = document.getElementById('modalMessage');
 
-        // --- Theme Switcher Logic ---
+        // --- Web Worker Setup ---
+        function setupWorker() {
+            const workerCode = `
+                let timer;
+                self.onmessage = function(e) {
+                    if (e.data === 'start') {
+                        timer = setInterval(() => {
+                            self.postMessage('tick');
+                        }, 1000);
+                    } else if (e.data === 'pause') {
+                        clearInterval(timer);
+                    }
+                };
+            `;
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            return new Worker(URL.createObjectURL(blob));
+        }
+
+        // --- Theme and Background Logic ---
         function setLightMode() {
             document.documentElement.classList.add('light-mode');
-            document.body.classList.add('light-mode');
             themeSwitcher.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
             localStorage.setItem('theme', 'light');
         }
 
         function setDarkMode() {
             document.documentElement.classList.remove('light-mode');
-            document.body.classList.remove('light-mode');
             themeSwitcher.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
             localStorage.setItem('theme', 'dark');
         }
 
         themeSwitcher.addEventListener('click', () => {
-            if (document.body.classList.contains('light-mode')) {
+            if (document.documentElement.classList.contains('light-mode')) {
                 setDarkMode();
             } else {
                 setLightMode();
             }
         });
 
-        // Load theme from local storage
-        document.addEventListener('DOMContentLoaded', () => {
+        bgInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const imageUrl = e.target.result;
+                    document.documentElement.style.setProperty('--page-bg-image', `url(${imageUrl})`);
+                    removeBgButton.style.display = 'flex';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        removeBgButton.addEventListener('click', () => {
+            document.documentElement.style.setProperty('--page-bg-image', 'none');
+            removeBgButton.style.display = 'none';
+        });
+
+        function loadCustomizations() {
             const savedTheme = localStorage.getItem('theme') || 'dark';
-            if (savedTheme === 'light') {
-                setLightMode();
-            } else {
-                setDarkMode();
-            }
-        });
-
+            if (savedTheme === 'light') setLightMode(); else setDarkMode();
+        }
 
         // --- Sound and Confetti Logic ---
-
         let audioCtx;
         function getAudioContext() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             return audioCtx;
         }
 
@@ -550,47 +604,24 @@
             notes.forEach((note, i) => {
                 const oscillator = ctx.createOscillator();
                 const gainNode = ctx.createGain();
-
                 oscillator.connect(gainNode);
                 gainNode.connect(ctx.destination);
-
                 oscillator.type = 'sine';
                 oscillator.frequency.setValueAtTime(note, startTime + i * duration);
                 gainNode.gain.setValueAtTime(volume, startTime + i * duration);
-
                 gainNode.gain.exponentialRampToValueAtTime(0.00001, startTime + i * duration + duration);
                 oscillator.start(startTime + i * duration);
                 oscillator.stop(startTime + i * duration + duration);
             });
         }
         
-        function playStartSound() {
-            playSound([440, 587.33], 0.08, 0.2); // A4, D5
-        }
+        function playStartSound() { playSound([440, 587.33], 0.08, 0.2); }
+        function playPauseSound() { playSound([220], 0.1, 0.15); }
+        function playResetSound() { playSound([587.33, 440], 0.08, 0.2); }
+        function playCompletionSound() { playSound([523.25, 659.25, 783.99, 1046.50], 0.1, 0.3); }
+        function triggerConfetti() { confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } }); }
 
-        function playPauseSound() {
-            playSound([220], 0.1, 0.15); // A3
-        }
-
-        function playResetSound() {
-            playSound([587.33, 440], 0.08, 0.2); // D5, A4
-        }
-
-        function playCompletionSound() {
-            playSound([523.25, 659.25, 783.99, 1046.50], 0.1, 0.3); // C5, E5, G5, C6
-        }
-
-        function triggerConfetti() {
-            confetti({
-                particleCount: 150,
-                spread: 90,
-                origin: { y: 0.6 }
-            });
-        }
-
-        // --- End Sound Logic ---
-
-
+        // --- Data and Time Logic ---
         function showModal(message, title = "Set a Goal") {
             modalTitle.textContent = title;
             modalMessage.textContent = message;
@@ -601,7 +632,14 @@
             modal.classList.remove('visible');
         }
 
-        function formatTime(timeInSeconds) {
+        function formatTimeDisplay(timeInSeconds) {
+            const hrs = Math.floor(timeInSeconds / 3600);
+            const mins = Math.floor((timeInSeconds % 3600) / 60);
+            const secs = timeInSeconds % 60;
+            return `${hrs}h ${mins}m ${secs}s`;
+        }
+        
+        function formatTimerCountdown(timeInSeconds) {
             const hrs = String(Math.floor(timeInSeconds / 3600)).padStart(2, '0');
             const mins = String(Math.floor((timeInSeconds % 3600) / 60)).padStart(2, '0');
             const secs = String(timeInSeconds % 60).padStart(2, '0');
@@ -609,41 +647,51 @@
         }
 
         function updateTimerDisplay() {
-            // Update main timer to show remaining time
-            let displayTime = formatTime(seconds);
+            let displayTime = formatTimerCountdown(seconds);
             hoursEl.textContent = displayTime.hrs;
             minutesEl.textContent = displayTime.mins;
             secondsEl.textContent = displayTime.secs;
-            
-            // Update "Time Worked" display
-            let workedHours = Math.floor(totalWorked / 3600);
-            let workedMinutes = Math.floor((totalWorked % 3600) / 60);
-            let workedSeconds = totalWorked % 60;
-            document.getElementById('timeWorked').textContent = `${workedHours}h ${workedMinutes}m ${workedSeconds}s`;
+            document.getElementById('timeWorked').textContent = formatTimeDisplay(totalWorkedToday);
+            document.getElementById('allTimeWorked').textContent = formatTimeDisplay(allTimeTotal + totalWorkedToday);
 
-            // Check if goal is complete
             if (seconds <= 0 && totalGoalSeconds > 0 && !isGoalComplete) {
                 isGoalComplete = true;
                 goalStatItem.classList.add('goal-complete');
                 workedStatItem.classList.add('goal-complete');
-                pauseTimer(true); // Stop the timer automatically, without sound
+                pauseTimer(true);
                 playCompletionSound();
                 triggerConfetti();
                 completionMessage.textContent = "Congratulations! Goal Reached!";
                 completionMessage.classList.add('visible');
             }
         }
+        
+        function saveProgress() {
+            localStorage.setItem('totalWorkedToday', totalWorkedToday);
+            localStorage.setItem('allTimeTotal', allTimeTotal);
+            localStorage.setItem('lastSavedDate', lastSavedDate);
+        }
+
+        function loadProgress() {
+            const savedDate = localStorage.getItem('lastSavedDate');
+            const today = new Date().toLocaleDateString();
+            allTimeTotal = parseInt(localStorage.getItem('allTimeTotal')) || 0;
+            if (savedDate === today) {
+                totalWorkedToday = parseInt(localStorage.getItem('totalWorkedToday')) || 0;
+            } else {
+                allTimeTotal += parseInt(localStorage.getItem('totalWorkedToday')) || 0;
+                totalWorkedToday = 0;
+                lastSavedDate = today;
+                saveProgress();
+            }
+        }
 
         function startTimer() {
             if (!isRunning && totalGoalSeconds > 0) {
-                if (isGoalComplete) return; // Don't start if goal is already complete
+                if (isGoalComplete) return;
                 isRunning = true;
                 playStartSound();
-                timer = setInterval(() => {
-                    seconds--; // Count down
-                    totalWorked++; // Still count up for total work
-                    updateTimerDisplay();
-                }, 1000);
+                timerWorker.postMessage('start');
             } else if (totalGoalSeconds <= 0) {
                 showModal("Please set a goal before starting the timer.");
             }
@@ -651,25 +699,21 @@
 
         function pauseTimer(isAutoPause = false) {
             if (isRunning) {
-                clearInterval(timer);
+                timerWorker.postMessage('pause');
                 isRunning = false;
-                if (!isAutoPause) {
-                    playPauseSound();
-                }
+                if (!isAutoPause) playPauseSound();
+                saveProgress();
             }
         }
 
         function resetTimer() {
-            clearInterval(timer);
-            isRunning = false;
+            if (isRunning) pauseTimer(true);
             isGoalComplete = false;
-            seconds = totalGoalSeconds; // Reset countdown to the full goal time
+            seconds = totalGoalSeconds;
             goalStatItem.classList.remove('goal-complete');
             workedStatItem.classList.remove('goal-complete');
             completionMessage.classList.remove('visible');
-            if (totalGoalSeconds > 0) {
-                playResetSound();
-            }
+            if (totalGoalSeconds > 0 && seconds > 0) playResetSound();
             updateTimerDisplay();
         }
 
@@ -684,18 +728,38 @@
                 return;
             }
             
-            resetTimer();
+            if(isRunning) pauseTimer();
 
+            seconds = totalGoalSeconds;
+            isGoalComplete = false;
+            goalStatItem.classList.remove('goal-complete');
+            workedStatItem.classList.remove('goal-complete');
+            completionMessage.classList.remove('visible');
             goalDisplay.innerHTML = `<span class="goal-check">✓</span>${hours}h ${minutes}m ${secs}s`;
             
             document.getElementById('hourInput').value = '';
             document.getElementById('minuteInput').value = '';
             document.getElementById('secondInput').value = '';
+            updateTimerDisplay();
         }
         
-        // Initial setup
-        seconds = 0;
-        updateTimerDisplay();
+        // --- Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            timerWorker = setupWorker();
+            timerWorker.onmessage = () => {
+                seconds--;
+                totalWorkedToday++;
+                updateTimerDisplay();
+            };
+            
+            loadCustomizations();
+            loadProgress();
+            seconds = 0;
+            updateTimerDisplay();
+        });
+
+        window.addEventListener('beforeunload', saveProgress);
+
     </script>
 </body>
 </html>
